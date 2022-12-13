@@ -51,8 +51,17 @@ public class PaymentServiceImp implements PaymentService {
 
 	private PaymentDto paymentProcess(TransactionType transactionType, String playerId, UUID transactionId, BigDecimal amount) {
 		Wallet wallet = walletService.getWalletLockByPlayerId(playerId);
-		validateTransactionId(transactionId);
-
+		Optional<Transaction> existingTransactionOptional = transactionService.findByTransactionId(transactionId);
+		if (existingTransactionOptional.isPresent()) {
+			if(existingTransactionOptional.get().getWallet().getId().equals(wallet.getId())
+					&& existingTransactionOptional.get().getAmount().equals(amount)) {
+				return paymentMapper.toDto(wallet);
+			}
+			else {
+				LOGGER.error("Transaction id is not unique " + transactionId.toString());
+				throw new NonUniqueTransactionException("Invalid transaction: " + transactionId);
+			}
+		}
 		Transaction transaction = new Transaction();
 		transaction.setTransactionId(transactionId);
 		transaction.setAmount(amount);
@@ -74,14 +83,6 @@ public class PaymentServiceImp implements PaymentService {
 			transaction.setWallet(wallet);
 			this.saveWalletAndTransaction(wallet, transaction);
 			return paymentMapper.toDto(wallet);
-		}
-	}
-
-	private void validateTransactionId(UUID transactionId) {
-		Optional<Transaction> existingTransactionOptional = transactionService.findByTransactionId(transactionId);
-		if (existingTransactionOptional.isPresent()) {
-			LOGGER.error("Transaction id is not unique " + transactionId.toString());
-			throw new NonUniqueTransactionException("Invalid transaction: " + transactionId);
 		}
 	}
 
